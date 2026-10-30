@@ -167,4 +167,5 @@ dist
 .wrangler/
 
 # service account key file
-/service-account-key.json
+*.json
+**/service-account-key.json
