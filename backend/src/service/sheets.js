@@ -38,22 +38,23 @@ export async function saveTransactionToSheets(env, trx, items = []) {
   const token = await getGoogleAccessToken(env.SERVICE_ACCOUNT_JSON, SHEETS_SCOPE);
   const spreadsheetId = env.GOOGLE_SHEETS_ID;
 
-  // A. Susun 1 baris untuk tabel 'transaction'
-  // Kolom: id | tanggal | merchant | total | dibayar_oleh | file_id
+  // Susun 1 baris untuk tabel 'transaction'
+  // Kolom: id | tanggal | merchant | kategori | total | dibayar_oleh | file_id
   const transactionRow = [
     [
       trx.id,                       // Format: TRX-yyyyMMdd-HHmmss
-      trx.tanggal,
+      trx.tanggal,                  // Format: YYYY-MM-DD
       trx.merchant,
+      trx.kategori || 'Makanan',    // Kategori hasil ekstraksi gemini.js
       trx.total,
       trx.dibayar_oleh,
       trx.file_id || '-',           // ID file Google Drive (atau '-' jika input teks manual)
     ]
   ];
 
-  // Simpan ke sheet 'transaction'
-  await appendToSheet(spreadsheetId, 'transaction!A:F', transactionRow, token);
-
+  // Simpan ke sheet 'transaction' (ubah rentang dari A:F menjadi A:G)
+  await appendToSheet(spreadsheetId, 'transaction!A:G', transactionRow, token);
+  
   // Susun baris-baris untuk tabel 'transaction_detail'
   // Kolom: transaction_id | nama_barang | jumlah | tempat | notes
   if (items.length > 0) {
@@ -82,7 +83,7 @@ export async function getDashboardDataFromSheets(env) {
 
   // Menggunakan batchGet agar cukup 1x HTTP request untuk mengambil 2 tabel sekaligus
   const ranges = [
-    'transaction!A2:F',
+    'transaction!A2:G',             // Diperbarui dari A2:F menjadi A2:G
     'transaction_detail!A2:E'
   ].map((r) => `ranges=${encodeURIComponent(r)}`).join('&');
 
@@ -120,11 +121,12 @@ export async function getDashboardDataFromSheets(env) {
 
   // Gabungkan header transaksi dengan rincian barangnya (Relasi One-to-Many)
   const transactions = transactionRows.map((row) => {
-    const [id, tanggal, merchant, total, dibayar_oleh, file_id] = row;
+    const [id, tanggal, merchant, kategori, total, dibayar_oleh, file_id] = row;
     return {
       id,
       tanggal,
       merchant,
+      kategori: kategori || 'Makanan',
       total: Number(total) || 0,
       dibayar_oleh,
       file_id: file_id !== '-' ? file_id : null,
